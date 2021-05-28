@@ -38,39 +38,52 @@ export class DRDBStateMachine extends cdk.Construct {
             role: functionCheckEMRStatusRole
         })
 
-        const jobFailed = new sfn.Fail(this, 'Job Failed', {
+        const failed = new sfn.Fail(this, 'Job Failed', {
             cause: 'DRDB Job Processing State Job Failed'
         });
+
+        const succeeded = new sfn.Succeed(this, "Succeeded")
 
         // TODO: use tasks.EmrCreateCluster
         const emrCreateClusterTask = new sfn.Wait(this, "Create EMR Cluster", {
             time: sfn.WaitTime.duration(cdk.Duration.seconds(5))
         })
 
-        const emrWaitForClusterTask = new sfn.Wait(this, "Wait for EMR Cluster", {
+        const emrWaitForClusterReadyTask = new sfn.Wait(this, "Wait for EMR Cluster", {
             time: sfn.WaitTime.duration(cdk.Duration.seconds(5))
         })
 
-        const emrSubmitStep = new sfn.Wait(this, "Wait for EMR Cluster", {
+        const emrSubmitSparkJob = new sfn.Wait(this, "Submit Data Processing Job", {
             time: sfn.WaitTime.duration(cdk.Duration.seconds(5))
         })
+
+        const emrStatusIsBootstrapping = sfn.Condition.stringEqualsJsonPath("$.Status", "BOOTSTRAPPING")
+        const emrStatusIsStarting = sfn.Condition.stringEqualsJsonPath("$.Status", "STARTING")
 
         const definition = new tasks.LambdaInvoke(this, "Check EMR Cluster Status", {
             lambdaFunction: functionCheckEMRStatus,
             outputPath: "$.Payload"
         })
-            .next(new sfn.Choice(this, 'EMR running?')
-                .when(sfn.Condition.isNull("$.Payload"), emrCreateClusterTask)
-                .when(sfn.Condition.stringEquals("$.status", "BOOTSTRAPPING"), emrWaitForClusterTask)
-                .when(sfn.Condition.stringEquals("$.status", "WAITING"), emrSubmitStep)
-                .otherwise(new sfn.Succeed(this, "Succeeded"))
-            )
-        
-// .when(sfn.Condition.or(sfn.Condition.stringEquals("$.status", "STARTING"), sfn.Condition.stringEquals("$.status", "BOOTSTRAPPING"), emrWaitForClusterTask)
 
+        // TODO = Work on updating step function schema
+        // const definition = new tasks.LambdaInvoke(this, "Check EMR Cluster Status", {
+        //     lambdaFunction: functionCheckEMRStatus,
+        //     outputPath: "$.Payload"
+        // })
+        //     .next(new sfn.Choice(this, 'Is the EMR Cluster ready?')
+        //         .when(sfn.Condition.isNull("$.Payload"), 
+        //             emrCreateClusterTask.next(
+        //                 emrWaitForClusterReadyTask
+        //             )
+        //             .next(emrSubmitSparkJob)
+        //             .next(succeeded))
+        //         .when(sfn.Condition.or(emrStatusIsBootstrapping, emrStatusIsStarting), 
+        //             emrWaitForClusterReadyTask)
+        //     )
+            
         this.Machine = new sfn.StateMachine(this, "DRDBStateMachine", {
             definition,
-            timeout: cdk.Duration.minutes(5)
+            timeout: cdk.Duration.minutes(10)
         })
     }
 }

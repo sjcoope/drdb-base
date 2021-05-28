@@ -18,6 +18,7 @@ def handler(event, context):
         client = boto3.client("emr")
         cluster_name = "DRDB-Job-Processor"
 
+        # TODO: Fix paging of this (returns max of 50) and we need to accomodate that.
         clusters = client.list_clusters(
             ClusterStates=["RUNNING", "WAITING", "STARTING", "BOOTSTRAPPING"]
         )
