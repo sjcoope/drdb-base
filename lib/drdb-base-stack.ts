@@ -1,9 +1,16 @@
 import * as cdk from '@aws-cdk/core';
+import { DRDBDdbStateTable } from './drdb-ddb-state-table';
+import { DRDBEMRCluster } from './drdb-emr-cluster';
+import { DRDBStateMachine } from './drdb-state-machine';
 
-export class DrdbBaseStack extends cdk.Stack {
+export class DRDBBaseStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // The code that defines your stack goes here
+    new DRDBEMRCluster(this, "DRDBProcessingEMRCluster")
+
+    new DRDBStateMachine(this, "DRDBProcessingStateMachine");
+    
+    new DRDBDdbStateTable(this, "DRDBProcessingDDBStateTable")
   }
 }

@@ -1,0 +1,237 @@
+Resources:
+  DRDBProcessingStateMachineCheckEMRStatusRole6C234037:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: emr.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingStateMachine/CheckEMRStatusRole/Resource
+  DRDBProcessingStateMachineDRDBCheckEMRStatusD0FEEE2E:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Ref: AssetParameters970920aa03de125b1aea98bf732a7acc1bd5d438bd10feb985520448300a0ccdS3Bucket4B3361AD
+        S3Key:
+          Fn::Join:
+            - ""
+            - - Fn::Select:
+                  - 0
+                  - Fn::Split:
+                      - "||"
+                      - Ref: AssetParameters970920aa03de125b1aea98bf732a7acc1bd5d438bd10feb985520448300a0ccdS3VersionKey2529E30C
+              - Fn::Select:
+                  - 1
+                  - Fn::Split:
+                      - "||"
+                      - Ref: AssetParameters970920aa03de125b1aea98bf732a7acc1bd5d438bd10feb985520448300a0ccdS3VersionKey2529E30C
+      Role:
+        Fn::GetAtt:
+          - DRDBProcessingStateMachineCheckEMRStatusRole6C234037
+          - Arn
+      Handler: function.handler
+      Runtime: python3.8
+    DependsOn:
+      - DRDBProcessingStateMachineCheckEMRStatusRole6C234037
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingStateMachine/DRDB-CheckEMRStatus/Resource
+      aws:asset:path: /Users/simoncoope/Code/drdb-base/src/function-check-emr-status
+      aws:asset:property: Code
+  DRDBProcessingStateMachineDRDBStateMachineRoleC93E4296:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: states.ap-southeast-2.amazonaws.com
+        Version: "2012-10-17"
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingStateMachine/DRDBStateMachine/Role/Resource
+  DRDBProcessingStateMachineDRDBStateMachineRoleDefaultPolicyF9EC3094:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: lambda:InvokeFunction
+            Effect: Allow
+            Resource:
+              Fn::GetAtt:
+                - DRDBProcessingStateMachineDRDBCheckEMRStatusD0FEEE2E
+                - Arn
+        Version: "2012-10-17"
+      PolicyName: DRDBProcessingStateMachineDRDBStateMachineRoleDefaultPolicyF9EC3094
+      Roles:
+        - Ref: DRDBProcessingStateMachineDRDBStateMachineRoleC93E4296
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingStateMachine/DRDBStateMachine/Role/DefaultPolicy/Resource
+  DRDBProcessingStateMachineDRDBStateMachine3A80F321:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      RoleArn:
+        Fn::GetAtt:
+          - DRDBProcessingStateMachineDRDBStateMachineRoleC93E4296
+          - Arn
+      DefinitionString:
+        Fn::Join:
+          - ""
+          - - '{"StartAt":"Check EMR Status","States":{"Check EMR Status":{"Next":"EMR running?","Retry":[{"ErrorEquals":["Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload","Resource":"arn:'
+            - Ref: AWS::Partition
+            - :states:::lambda:invoke","Parameters":{"FunctionName":"
+            - Fn::GetAtt:
+                - DRDBProcessingStateMachineDRDBCheckEMRStatusD0FEEE2E
+                - Arn
+            - '","Payload.$":"$"}},"EMR running?":{"Type":"Choice","Choices":[{"Variable":"$.Payload","IsNull":true,"Next":"Job Failed"}],"Default":"Succeeded"},"Succeeded":{"Type":"Succeed"},"Job Failed":{"Type":"Fail","Cause":"DRDB Job Processing State Job Failed"}},"TimeoutSeconds":300}'
+    DependsOn:
+      - DRDBProcessingStateMachineDRDBStateMachineRoleDefaultPolicyF9EC3094
+      - DRDBProcessingStateMachineDRDBStateMachineRoleC93E4296
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingStateMachine/DRDBStateMachine/Resource
+  DRDBProcessingEMRClusterSecurityGroup1C317606:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DrdbBaseStack/DRDBProcessingEMRCluster/SecurityGroup
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      VpcId: vpc-c72f20a0
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingEMRCluster/SecurityGroup/Resource
+  DRDBProcessingEMRClusterDRDBFlowRoles1F46E1A3:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AmazonElasticMapReduceforEC2Role
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingEMRCluster/DRDBFlowRoles/Resource
+  DRDBProcessingEMRClusterDRDBFlowRolesDefaultPolicyB17595AD:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:GetObject*
+              - s3:GetBucket*
+              - s3:List*
+            Effect: Allow
+            Resource:
+              - Fn::GetAtt:
+                  - DRDBProcessingEMRClusterDRDBEMRScriptBucketCF853F10
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - DRDBProcessingEMRClusterDRDBEMRScriptBucketCF853F10
+                        - Arn
+                    - /*
+          - Action:
+              - s3:GetObject*
+              - s3:GetBucket*
+              - s3:List*
+              - s3:DeleteObject*
+              - s3:PutObject
+              - s3:Abort*
+            Effect: Allow
+            Resource:
+              - Fn::GetAtt:
+                  - DRDBProcessingEMRClusterDRDBEMRLogBucket2C89A8C1
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - DRDBProcessingEMRClusterDRDBEMRLogBucket2C89A8C1
+                        - Arn
+                    - /*
+        Version: "2012-10-17"
+      PolicyName: DRDBProcessingEMRClusterDRDBFlowRolesDefaultPolicyB17595AD
+      Roles:
+        - Ref: DRDBProcessingEMRClusterDRDBFlowRoles1F46E1A3
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingEMRCluster/DRDBFlowRoles/DefaultPolicy/Resource
+  DRDBProcessingEMRClusterInstanceProfileC0918A21:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - Ref: DRDBProcessingEMRClusterDRDBFlowRoles1F46E1A3
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingEMRCluster/InstanceProfile
+  DRDBProcessingEMRClusterDRDBEMRScriptBucketCF853F10:
+    Type: AWS::S3::Bucket
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingEMRCluster/DRDB-EMR-ScriptBucket/Resource
+  DRDBProcessingEMRClusterDRDBEMRLogBucket2C89A8C1:
+    Type: AWS::S3::Bucket
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingEMRCluster/DRDB-EMR-LogBucket/Resource
+  DRDBProcessingEMRClusterDRDBEMRClusterBE577AA7:
+    Type: AWS::EMR::Cluster
+    Properties:
+      Instances:
+        AdditionalMasterSecurityGroups:
+          - Ref: DRDBProcessingEMRClusterSecurityGroup1C317606
+        Ec2KeyName: sjc-kp
+        Ec2SubnetId: subnet-3e5abb76
+        MasterInstanceGroup:
+          InstanceCount: 1
+          InstanceType: r6g.xlarge
+          Name: Master
+      JobFlowRole:
+        Ref: DRDBProcessingEMRClusterInstanceProfileC0918A21
+      Name: DRDB-Job-Processor
+      ServiceRole: EMR_DefaultRole
+      Applications:
+        - Name: Spark
+        - Name: Hive
+      LogUri:
+        Fn::Join:
+          - ""
+          - - s3://
+            - Ref: DRDBProcessingEMRClusterDRDBEMRLogBucket2C89A8C1
+      ReleaseLabel: emr-6.2.0
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/DRDBProcessingEMRCluster/DRDBEMRCluster
+  CDKMetadata:
+    Type: AWS::CDK::Metadata
+    Properties:
+      Analytics: v2:deflate64:H4sIAAAAAAAAE1WQ0W7CMAxFv4X31NBt4nlbpU1Im1SVL8hcA6ZtguKECUX596VhTOzJvravfeQa6tUa6sWz/pYK+2EZ0TqCuPUaB9VYI94F9OpFhHwu7tnsVUdig0NSzc602umJPLlZ3BpJzesi6wliZ8cyWGJrR8ZL8f1lm3xDG6TW2R2P2Tvq6avXEN+CQc/WzEO3PCl5rPQMI1CYlHg67X67kk2aR9UcLGe8bUAk6lXm9vSp8cCmoNzr9H9B5bUMAh8FYWPOdiBF+JAfQhgc+8u7s+FUltwXZiyIrwGHTJSb1ywpmhxk2YwhX3EpKWN7gqMsz/UT1GtYLY7CXLlgPE8E3TX+AFtnB4uVAQAA
+    Metadata:
+      aws:cdk:path: DrdbBaseStack/CDKMetadata/Default
+Parameters:
+  AssetParameters970920aa03de125b1aea98bf732a7acc1bd5d438bd10feb985520448300a0ccdS3Bucket4B3361AD:
+    Type: String
+    Description: S3 bucket for asset "970920aa03de125b1aea98bf732a7acc1bd5d438bd10feb985520448300a0ccd"
+  AssetParameters970920aa03de125b1aea98bf732a7acc1bd5d438bd10feb985520448300a0ccdS3VersionKey2529E30C:
+    Type: String
+    Description: S3 key for asset version "970920aa03de125b1aea98bf732a7acc1bd5d438bd10feb985520448300a0ccd"
+  AssetParameters970920aa03de125b1aea98bf732a7acc1bd5d438bd10feb985520448300a0ccdArtifactHash5F602BA1:
+    Type: String
+    Description: Artifact hash for asset "970920aa03de125b1aea98bf732a7acc1bd5d438bd10feb985520448300a0ccd"
+
